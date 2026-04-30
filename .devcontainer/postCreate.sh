@@ -1,9 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# Install Claude Code CLI
-curl -fsSL https://claude.ai/install.sh | bash
-
 # Refuse to continue without a git repo. setuptools-scm needs git
 # tags to compute the package version, and pre-commit installs its
 # hooks into .git/hooks — both fail with cryptic errors that VS Code
@@ -43,3 +40,7 @@ if [ -f .gitmodules ]; then
     missing=$(git submodule status | awk '/^-/ {print $2}')
     [ -n "$missing" ] && git submodule update --init $missing
 fi
+
+
+# Install Claude Code CLI
+curl -fsSL https://claude.ai/install.sh | bash

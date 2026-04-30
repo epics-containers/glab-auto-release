@@ -1,5 +1,5 @@
 # Changes here will be overwritten by Copier
-_commit: 5.0.3-15-g19e9846
+_commit: 5.0.3-17-g5eed878
 _src_path: https://github.com/gilesknap/python-copier-template
 add_claude: true
 author_email: giles.knap@diamond.ac.uk
