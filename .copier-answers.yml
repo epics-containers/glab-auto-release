@@ -1,0 +1,18 @@
+# Changes here will be overwritten by Copier
+_commit: 5.0.3-15-g19e9846
+_src_path: https://github.com/gilesknap/python-copier-template
+add_claude: true
+author_email: giles.knap@diamond.ac.uk
+author_name: Giles Knap
+description: Automatically releases repositories in gitlab
+distribution_name: glab-auto-release
+docker: true
+docker_debug: false
+docs_type: README
+git_platform: github.com
+github_org: epics-containers
+package_name: glab_auto_release
+pypi: false
+repo_name: glab-auto-release
+strict_typing: false
+type_checker: pyright

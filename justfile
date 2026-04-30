@@ -1,0 +1,23 @@
+# Start Claude Code in sandbox mode (no SSH agent, skip permission prompts)
+claude:
+    SSH_AUTH_SOCK= IS_SANDBOX=1 VSCODE_GIT_IPC_HANDLE= GIT_ASKPASS= claude --dangerously-skip-permissions
+
+
+# Authenticate gh CLI with a GitHub PAT (token not stored in shell history)
+gh-auth:
+    #!/bin/bash
+    read -sp "GitHub PAT: " t && echo
+    echo "$t" | gh auth login --with-token
+    unset t
+    gh auth setup-git
+    gh auth status
+
+
+# Authenticate glab CLI with a GitLab PAT (token not stored in shell history).
+# --git-protocol https prevents glab's SSH insteadOf rewrite.
+glab-auth hostname="gitlab.com":
+    #!/bin/bash
+    read -sp "GitLab PAT for {{ hostname }}: " t && echo
+    echo "$t" | glab auth login --stdin --hostname {{ hostname }} --git-protocol https
+    unset t
+    glab auth status
