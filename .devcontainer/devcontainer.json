@@ -12,20 +12,13 @@
     "remoteEnv": {
         // Allow X11 apps to run inside the container
         "DISPLAY": "${localEnv:DISPLAY}",
-        // Disable SSH agent forwarding — prevents Claude from using host SSH keys.
-        // No VS Code setting disables this, so the remoteEnv blank is the actual
-        // defence (the GIT_ASKPASS / VSCODE_GIT_IPC_HANDLE bridge is closed at
-        // the customizations.vscode.settings level instead — see below).
-        "SSH_AUTH_SOCK": "",
-        // VS Code injects VSCODE_IPC_HOOK_CLI pointing at /tmp/vscode-ipc-*.sock,
-        // which lets a container process invoke the `code` CLI on the host
-        // (open files, run commands). Blank it; `just claude` also masks /tmp
-        // via mount namespace so the path is unreachable inside Claude.
-        "VSCODE_IPC_HOOK_CLI": "",
-        // BROWSER points at a host helper that opens URLs on the host. Blank it
-        // so anything in-container that calls $BROWSER stays in-container.
-        "BROWSER": "",
-        // Mark this shell as running inside the devcontainer
+        // Mark this shell as running inside the devcontainer.
+        // SSH_AUTH_SOCK / VSCODE_IPC_HOOK_CLI / BROWSER / GIT_ASKPASS etc.
+        // are intentionally NOT blanked here — VS Code's terminal launch
+        // re-injects most of them anyway, so blanking at remoteEnv would be
+        // theatre. The Claude-side blanks live in claude-sandbox.sh's exec
+        // line, where they actually take effect; the user terminal keeps
+        // the host bridges (agent forwarding, askpass popup, etc.).
         "IN_DEVCONTAINER": "1",
         // Put things that allow it in the persistent cache
         "PRE_COMMIT_HOME": "/cache/pre-commit",
@@ -49,17 +42,16 @@
                 // Workaround to prevent garbled python REPL in the terminal
                 // https://github.com/microsoft/vscode-python/issues/25505
                 "python.terminal.shellIntegration.enabled": false,
-                // Close every VS Code channel that would otherwise forward host git
-                // credentials into the container. Together these stop the integrated
-                // terminal from inheriting GIT_ASKPASS / VSCODE_GIT_IPC_HANDLE, stop
-                // the Dev Containers extension from writing a credential.helper line
-                // into /etc/gitconfig, and stop the host ~/.gitconfig (with its SSH
-                // url.insteadOf rewrites and per-host helpers) being copied in.
-                // postStart.sh and the sandbox-check.sh hook are belt-and-braces
-                // verifications that these settings actually took effect.
-                "git.terminalAuthentication": false,
+                // Don't let the Dev Containers extension write a credential.helper
+                // into /etc/gitconfig (it would point at /tmp/vscode-remote-
+                // containers-*.js, which is masked inside Claude's namespace anyway,
+                // but writing nothing is cleaner). Don't inject the host docker
+                // credential helper either. git.terminalAuthentication is left at
+                // its default (true) so the user terminal gets the natural VS Code
+                // "log in to GitHub" popup; Claude's namespace blanks GIT_ASKPASS
+                // and VSCODE_GIT_IPC_HANDLE in claude-sandbox.sh, and /tmp is
+                // tmpfs-masked, so the popup channel is closed for Claude.
                 "dev.containers.gitCredentialHelperConfigLocation": "none",
-                "dev.containers.copyGitConfig": false,
                 "dev.containers.dockerCredentialHelper": false
             },
             // Add the IDs of extensions you want installed when the container is created.
@@ -120,10 +112,5 @@
     ],
     // Mount the parent as /workspaces so we can pip install peers as editable
     "workspaceMount": "source=${localWorkspaceFolder}/..,target=/workspaces,type=bind",
-    "postCreateCommand": ".devcontainer/postCreate.sh",
-    "postStartCommand": ".devcontainer/postStart.sh",
-    // VS Code's Dev Containers extension re-injects its credential bridge
-    // when the editor attaches — after postStart has already run. Re-run
-    // the cleanup at attach so the leak is closed before any git operation.
-    "postAttachCommand": ".devcontainer/postStart.sh"
+    "postCreateCommand": ".devcontainer/postCreate.sh"
 }
