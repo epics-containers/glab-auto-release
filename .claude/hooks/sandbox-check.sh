@@ -9,6 +9,12 @@ fail() { echo "BLOCKED: $1" >&2; exit 2; }
 [ -n "${IN_DEVCONTAINER:-}" ] || \
     fail "not in the devcontainer (IN_DEVCONTAINER unset). Reopen the project in the devcontainer."
 
+# IS_SANDBOX=1 is set by the inner `just claude` script after it sets up
+# the private mount namespace. If it's missing, Claude was launched
+# without the namespace and /tmp/vscode-*.sock host bridges are reachable.
+[ -n "${IS_SANDBOX:-}" ] || \
+    fail "IS_SANDBOX unset — Claude was not launched via \"just claude\", so the mount-namespace sandbox is not active."
+
 # Host SSH agent must not be reachable. remoteEnv blanks SSH_AUTH_SOCK and
 # `just claude` re-blanks it; if it is set, neither layer applied.
 [ -z "${SSH_AUTH_SOCK:-}" ] || \

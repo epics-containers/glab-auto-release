@@ -22,6 +22,12 @@ done
 # entries cannot fall through to it.
 rm -f /tmp/vscode-remote-containers-*.js
 
+# VS Code also injects /tmp/vscode-*.sock host-bridge sockets. `just claude`
+# masks /tmp via mount namespace so Claude cannot see them, but removing
+# them at attach is cheap belt-and-braces for any non-Claude process in
+# the parent (host-visible) namespace.
+rm -f /tmp/vscode-*.sock
+
 # Force all SSH-style remotes to use HTTPS so the gh/glab credential helpers
 # handle auth. This keeps the container SSH-key-free (Claude stays sandboxed)
 # while still allowing push/pull on repos whose remotes are set to git@...:.

@@ -11,10 +11,37 @@ and how to verify the sandbox is intact.
 
 ## What's locked down
 
-- **No host SSH keys.** `SSH_AUTH_SOCK` is unset in `remoteEnv`, so any
-  SSH-agent forwarded by the host is invisible inside the container. No
-  private keys are mounted into `/root/.ssh` either — only `known_hosts`.
-- **No VS Code git credential injection.** Three Dev Containers settings
+- **No host bridges via VS Code IPC sockets.** VS Code's server creates
+  several unix sockets in `/tmp` and `/run/user/<uid>/` that are bridges
+  back to the host: `vscode-ipc-*.sock` (runs `code` CLI on the host),
+  `vscode-git-*.sock` (git credential bridge — surfaces host PATs),
+  `vscode-ssh-auth-*.sock` (host SSH agent forward), and
+  `vscode-remote-containers-ipc-*.sock` (Dev Containers extension RPC).
+  These are re-created on every window attach and continue to appear up
+  to ~60s later — see [the threat-model writeup][demmel-blog] — so any
+  one-shot cleanup leaves a window. The defence is the **`unshare -m`**
+  call in `just claude`: Claude runs in a private mount namespace where
+  `/tmp` and `/run/user/<uid>/` are fresh tmpfs. The bridges still exist
+  in the parent namespace (VS Code keeps using them normally) but are
+  invisible to Claude. No race, no sweeper, no recurring check needed.
+  Requires `--cap-add=SYS_ADMIN` in `runArgs` for rootless podman.
+
+  [demmel-blog]: https://www.danieldemmel.me/blog/coding-agents-in-secured-vscode-dev-containers
+- **No host SSH keys, AWS/GCP/Azure/Docker credentials, GPG keys, or
+  netrc.** The same `unshare -m` masks `/root/.ssh`, `/root/.gnupg`,
+  `/root/.aws`, `/root/.azure`, `/root/.gcloud`, `/root/.docker`, and
+  `/root/.netrc` (where present) with empty tmpfs. This means you *can*
+  bind-mount your host `~/.ssh` into the container if you want to use
+  SSH keys from a regular terminal — Claude's namespace blanks them out
+  while non-Claude shells see the originals. `SSH_AUTH_SOCK` is also
+  blanked in `remoteEnv` and re-blanked inside the namespace as
+  belt-and-braces.
+- **Claude dies with its parent shell.** `setpriv --pdeathsig SIGKILL`
+  on the inner `claude` exec sets `PR_SET_PDEATHSIG`, so if the wrapping
+  `unshare`'d shell exits (terminal closed, Ctrl-C, etc.) the kernel
+  immediately kills Claude — there's no orphaned-claude window where the
+  namespace context is gone but Claude is still running tools.
+- **No VS Code git credential injection.** Four Dev Containers settings
   pinned in `devcontainer.json` close every channel at the boundary:
     - `git.terminalAuthentication: false` — VS Code's Git extension never
       sets `GIT_ASKPASS` / `VSCODE_GIT_IPC_HANDLE` in the integrated
@@ -27,6 +54,9 @@ and how to verify the sandbox is intact.
     - `dev.containers.copyGitConfig: false` — the host's `~/.gitconfig`
       is not copied into the container, so any `url.ssh://...insteadOf`
       rewrites or per-host helpers stay on the host.
+    - `dev.containers.dockerCredentialHelper: false` — VS Code does not
+      inject the host's docker credential helper, so any in-container
+      docker tooling cannot reach back to a host registry login.
 
   These settings are the primary defence. Two layers of belt-and-braces
   sit on top: `postStart.sh` re-asserts `credential.helper` cleanup at
@@ -70,13 +100,26 @@ and how to verify the sandbox is intact.
 
 ## Verifying the sandbox
 
-From inside the container:
+Run inside `just claude` itself (use Claude's bash tool, or run the same
+commands manually after dropping into a shell that has `unshare -m` set
+up the way `just claude` does). The mount-namespace defences only apply
+inside that namespace — a regular VS Code terminal will see the bridges
+exactly as VS Code created them, which is correct.
 
 ```bash
 # Should be empty / unset
 echo "SSH_AUTH_SOCK='${SSH_AUTH_SOCK:-<unset>}'"
-ssh-add -l                                         # "Could not open a connection..."
-ls /root/.ssh                                      # only known_hosts
+echo "IS_SANDBOX='${IS_SANDBOX:-<unset>}'"          # should be 1
+ssh-add -l                                          # "Could not open a connection..."
+
+# /tmp and /run/user should be empty tmpfs inside Claude's namespace.
+ls /tmp                                             # nothing matching vscode-*
+ls /run/user/*/ 2>/dev/null                         # nothing matching vscode-*
+mount | grep -E ' on /tmp |/run/user'               # tmpfs entries from claude-sandbox.sh
+
+# /root/.ssh and friends should be empty even if you bind-mount the host
+# originals via devcontainer.json — Claude's namespace masks them.
+ls /root/.ssh /root/.gnupg /root/.aws 2>/dev/null   # all empty (or missing)
 
 # Should NOT return a host PAT
 printf 'protocol=https\nhost=github.com\n\n' | git credential fill
@@ -86,7 +129,8 @@ git config --global --list | grep -i credential
 ```
 
 If `git credential fill` returns a `password=gho_...` for github.com when
-you have not run `just gh-auth`, the sandbox is leaking — open an issue
+you have not run `just gh-auth`, or if `ls /tmp` shows any `vscode-*`
+entries inside the namespace, the sandbox is leaking — open an issue
 against the python-copier-template.
 
 ## Authenticating
