@@ -35,8 +35,8 @@ fi
 # freshly populated venv and against any new `uv` location after a base
 # image bump.
 uv venv --clear
-uv sync
 hash -r
+uv sync
 pre-commit install --install-hooks
 
 # Init only submodules that aren't checked out yet — first-clone
