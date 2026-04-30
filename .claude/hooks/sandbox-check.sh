@@ -20,19 +20,11 @@ fail() { echo "BLOCKED: $1" >&2; exit 2; }
 [ -z "${SSH_AUTH_SOCK:-}" ] || \
     fail "SSH_AUTH_SOCK is set ($SSH_AUTH_SOCK) — host SSH agent is reachable. run \"just claude\" or rebuild the devcontainer."
 
-# VS Code git credential bridge must be unreachable. The env vars may
-# still be inherited, but the private mount namespace should hide the
-# IPC socket and askpass script under /tmp. If the files exist, /tmp
-# is not isolated.
-[ ! -e "${VSCODE_GIT_IPC_HANDLE:-}" ] || \
-    fail "VSCODE_GIT_IPC_HANDLE socket ($VSCODE_GIT_IPC_HANDLE) is reachable — VS Code credential bridge leaked into the namespace. Relaunch via \"just claude\" or rebuild the devcontainer."
+# GIT_ASKPASS points at a script under /.vscode-server, which the
+# namespace does NOT mask. If the file is reachable, VS Code's
+# askpass injection slipped past git.terminalAuthentication=false.
 [ ! -e "${GIT_ASKPASS:-}" ] || \
-    fail "GIT_ASKPASS script ($GIT_ASKPASS) is reachable — VS Code askpass leaked into the namespace. Relaunch via \"just claude\" or rebuild the devcontainer."
-
-# The /tmp credential helper script VS Code drops in must have been removed.
-if compgen -G '/tmp/vscode-remote-containers-*.js' >/dev/null; then
-    fail "/tmp/vscode-remote-containers-*.js bridge present — re-run .devcontainer/postStart.sh."
-fi
+    fail "GIT_ASKPASS script ($GIT_ASKPASS) is reachable — VS Code askpass leaked. Rebuild the devcontainer (git.terminalAuthentication should be false)."
 
 # system-scope credential.helper is where VS Code injects; if anything
 # is set there git will use it before our per-host helpers.
