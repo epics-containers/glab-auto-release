@@ -22,6 +22,12 @@ done
 # entries cannot fall through to it.
 rm -f /tmp/vscode-remote-containers-*.js
 
+# VS Code also injects /tmp/vscode-ipc-*.sock paired with $VSCODE_IPC_HOOK_CLI,
+# which lets a container process run the `code` CLI on the host. The env var
+# is blanked in remoteEnv; remove the socket so a re-injected env cannot find
+# it either. IMPORTANT: Also applied to vscode-git-*.
+rm -f /tmp/vscode-*.sock
+
 # Force all SSH-style remotes to use HTTPS so the gh/glab credential helpers
 # handle auth. This keeps the container SSH-key-free (Claude stays sandboxed)
 # while still allowing push/pull on repos whose remotes are set to git@...:.

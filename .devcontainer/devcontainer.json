@@ -17,6 +17,13 @@
         // defence (the GIT_ASKPASS / VSCODE_GIT_IPC_HANDLE bridge is closed at
         // the customizations.vscode.settings level instead — see below).
         "SSH_AUTH_SOCK": "",
+        // VS Code injects VSCODE_IPC_HOOK_CLI pointing at /tmp/vscode-ipc-*.sock,
+        // which lets a container process invoke the `code` CLI on the host
+        // (open files, run commands). Blank it; postStart.sh removes the socket.
+        "VSCODE_IPC_HOOK_CLI": "",
+        // BROWSER points at a host helper that opens URLs on the host. Blank it
+        // so anything in-container that calls $BROWSER stays in-container.
+        "BROWSER": "",
         // Mark this shell as running inside the devcontainer
         "IN_DEVCONTAINER": "1",
         // Put things that allow it in the persistent cache
@@ -51,7 +58,8 @@
                 // verifications that these settings actually took effect.
                 "git.terminalAuthentication": false,
                 "dev.containers.gitCredentialHelperConfigLocation": "none",
-                "dev.containers.copyGitConfig": false
+                "dev.containers.copyGitConfig": false,
+                "dev.containers.dockerCredentialHelper": false
             },
             // Add the IDs of extensions you want installed when the container is created.
             "extensions": [

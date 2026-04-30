@@ -8,14 +8,17 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     && apt-get dist-clean
 
 # Node is required by Claude Code's hook runtime; just powers the
-# container's claude/gh-auth/glab-auth recipes in justfile.
-# TODO: nodejs, just, gh and glab will move into the ubuntu-devcontainer
-# base image once it ships on Ubuntu 26.04, where all are available
-# from apt at sufficient versions. At that point these blocks can be
-# dropped.
+# container's claude/gh-auth/glab-auth recipes in justfile;
+# inotify-tools provides inotifywait for the Claude socket sweeper
+# (see .devcontainer/socket-sweeper.sh).
+# TODO: nodejs, just, inotify-tools, gh and glab will move into the
+# ubuntu-devcontainer base image once it ships on Ubuntu 26.04, where
+# all are available from apt at sufficient versions. At that point
+# these blocks can be dropped.
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     nodejs \
     just \
+    inotify-tools \
     && apt-get dist-clean
 
 # GitHub CLI — used by Claude to authenticate to github.com via PAT.
