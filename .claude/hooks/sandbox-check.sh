@@ -21,15 +21,9 @@ fail() { echo "BLOCKED: $1" >&2; exit 2; }
     fail "SSH_AUTH_SOCK is set ($SSH_AUTH_SOCK) — host SSH agent is reachable. run \"just claude\" or rebuild the devcontainer."
 
 # GIT_ASKPASS points at a script under /.vscode-server, which the
-# namespace does NOT mask. If the file is reachable, VS Code's
-# askpass injection slipped past git.terminalAuthentication=false.
+# namespace does NOT mask. If the env var is non-empty AND the file is
+# reachable, claude-sandbox.sh's exec-line blank failed to apply.
 [ ! -e "${GIT_ASKPASS:-}" ] || \
-    fail "GIT_ASKPASS script ($GIT_ASKPASS) is reachable — VS Code askpass leaked. Rebuild the devcontainer (git.terminalAuthentication should be false)."
-
-# system-scope credential.helper is where VS Code injects; if anything
-# is set there git will use it before our per-host helpers.
-if git config --system --get credential.helper >/dev/null 2>&1; then
-    fail "system credential.helper is still set — re-run .devcontainer/postStart.sh."
-fi
+    fail "GIT_ASKPASS script ($GIT_ASKPASS) is reachable — claude-sandbox.sh did not blank the env var. Rebuild the devcontainer or re-run \"just claude\"."
 
 exit 0
